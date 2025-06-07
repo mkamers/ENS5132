@@ -20,7 +20,7 @@ import locale  # Usado para formatar os meses em português
 # %% 2. Configuração de Parâmetros e Caminhos
 # --- Defina seus caminhos e parâmetros aqui ---
 PASTA_DADOS = r"C:\Users\maria\OneDrive\ENS5132\Trabalho_02\inputs\merra"
-CAMINHO_SHAPEFILE = r"C:\Users\maria\OneDrive\ENS5132\Desafio\inputs\BR_Municipios_2024.shp"
+CAMINHO_SHAPEFILE_ESTADOS = r"C:\Users\maria\OneDrive\ENS5132\Desafio\inputs\BR_Municipios_2024.shp"
 
 # Variável de interesse do MERRA-2 (Tendência Total da Temperatura)
 VARIAVEL_INTERESSE = "DTDTTOT"
@@ -59,11 +59,13 @@ print(">>> Realizando recorte com o shapefile dos municípios do Brasil...")
 
 # Carrega e prepara o shapefile
 try:
-    shape = gpd.read_file(CAMINHO_SHAPEFILE)
+    shape = gpd.read_file(CAMINHO_SHAPEFILE_ESTADOS)
     # Garante que o shapefile esteja no mesmo sistema de coordenadas dos dados (WGS84)
     shape = shape.to_crs("EPSG:4326")
+    LINHA_ESTADOS = shape.geometry.boundary
+    gdf_LINHA_ESTADOS = gpd.GeoDataFrame(geometry=LINHA_ESTADOS, crs=shape.crs)
 except Exception as e:
-    print(f"Erro ao carregar ou processar o shapefile: {e}")
+    print(f"Erro ao carregar ou processar o shapefile: {e}") 
     
 # Adiciona informações geoespaciais ao DataArray do xarray
 data_array = data_array.rio.write_crs("EPSG:4326")
@@ -71,13 +73,25 @@ data_array = data_array.rio.write_crs("EPSG:4326")
 # Informa ao rioxarray quais dimensões correspondem a 'x' e 'y'
 data_array = data_array.rio.set_spatial_dims(x_dim="lon", y_dim="lat", inplace=True)
 
-# Realiza o recorte (clip)
+
 try:
+    # Usamos shape_estados.geometry para o recorte, para que o dado fique restrito ao Brasil
     data_recortado = data_array.rio.clip(shape.geometry, drop=True)
     print("Recorte geográfico realizado com sucesso.")
 except Exception as e:
     print(f"Erro durante o recorte com rioxarray: {e}")
-    data_recortado = None
+    
+
+
+# ----> MUDEI AQUI <-----
+
+# Realiza o recorte (clip)
+#try:
+#    data_recortado = data_array.rio.clip(shape.geometry, drop=True)
+#    print("Recorte geográfico realizado com sucesso.")
+#except Exception as e:
+#    print(f"Erro durante o recorte com rioxarray: {e}")
+#    data_recortado = None
 
 # %% 5. Análise e Visualização dos Dados
 if data_recortado is not None:
