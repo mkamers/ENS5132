@@ -99,28 +99,28 @@ if data_recortado is not None:
     ax = plt.gca()
     ax.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%b/%Y'))
-    plt.title(f"Média da Tendência de Temperatura em {NIVEL_PRESSAO} hPa para o Brasil", fontsize=16, pad=20)
-    plt.xlabel("Mês/Ano", fontsize=12)
+    plt.title(f"Média da Tendência de Temperatura em {NIVEL_PRESSAO} hPa para o Brasil no ano de 2024", fontsize=16, pad=20)
+    plt.xlabel("2024", fontsize=12)
     plt.ylabel("Tendência Média (K/dia)", fontsize=12)
     plt.grid(True, linestyle='--', alpha=0.6)
     plt.tight_layout()
     plt.show()
 
     # GRÁFICO 2: Padrão Espacial da Média Temporal
-    print(">>> Gerando Gráfico 2: Mapa da Tendência Média...")
+    print(">>> Gerando Gráfico 2: Mapa da Tendência Média em ...")
     media_temporal = data_recortado.mean(dim='time') * 86400
 
     plt.figure(figsize=(10, 8))
     media_temporal.plot(
         cmap='RdBu_r',
         robust=True,
-        cbar_kwargs={'label': 'Tendência Média (K/dia)', 'orientation': 'horizontal', 'pad': 0.1}
+        cbar_kwargs={'label': 'Tendência Média (K/dia)', 'orientation': 'vertical', 'pad': 0.1}
     )
-    shape.plot(ax=plt.gca(), facecolor='none', edgecolor='black', linewidth=0.5)
+    shape.plot(ax=plt.gca(), facecolor='none', edgecolor='black', linewidth=0.4)
     plt.title(f"Padrão Espacial da Tendência de Temperatura em {NIVEL_PRESSAO} hPa", fontsize=16, pad=20)
     plt.xlabel('Longitude', fontsize=12)
     plt.ylabel('Latitude', fontsize=12)
-    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.grid(True, linestyle='--', alpha=0.3)
     plt.tight_layout()
     plt.show()
 
