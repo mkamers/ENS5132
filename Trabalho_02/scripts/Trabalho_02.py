@@ -1,231 +1,150 @@
 # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
-Criado em: sex jun  6 18:04:16 2025
-Atualizado em: 2024-06-XX
+TRABALHO FINAL - Análise de Tendências de Temperatura (MERRA-2)
 
-@author: maria
-
-Script para analisar dados MERRA-2 em arquivos netCDF:
-- Abrir múltiplos arquivos com xarray
-- Verificar coordenadas e fazer recortes corretos
-- Recortar usando shapefile com geopandas e rioxarray
-- Gerar visualizações espaciais e temporais
-- Calcular estatísticas básicas para entender os dados
-
-Fonte dos dados: NASA MERRA-2 https://disc.gsfc.nasa.gov/datasets/M2TUNPTDT_5.12.4/summary
+Este script realiza uma análise completa dos dados de reanálise MERRA-2,
+com foco nas tendências de temperatura em um nível específico da atmosfera.
 
 """
 
-#%% 1: Imports
+# %% 1. Importação das Bibliotecas Essenciais
 import os
 import xarray as xr
-#import rioxarray
+import rioxarray
 import geopandas as gpd
 import matplotlib.pyplot as plt
-#import numpy as np
-
-#%% 2: Definição dos caminhos e variáveis
-
-# Pasta onde estão os arquivos .nc4 da base MERRA-2
-pasta_dados = r"C:\Users\maria\OneDrive\ENS5132\Trabalho_02\inputs\merra"
-padrao_arquivos = os.path.join(pasta_dados, "*.nc4")
-
-# Caminho para shapefile com municípios do Brasil para recorte geográfico
-caminho_shapefile = r"C:\Users\maria\OneDrive\ENS5132\Desafio\inputs\BR_Municipios_2024.shp"
-
-# Nome da variável a ser analisada 
-variavel_interesse = "DTDTTOT" 
-
-# Nível de pressão para selecionar, se existir (500 hPa por padrão)
-nivel_pressao = 850   # hPa
-
-# Faixa geográfica para recorte inicial aproximado (América do Sul)
-lat_min, lat_max = -60, 15
-lon_min, lon_max = -90, -30
-
-#%% 3: Carregar os dados
-
-print("Carregando dataset a partir dos arquivos...")
-ds = xr.open_mfdataset(padrao_arquivos, combine='by_coords', parallel=True)
-
-print("Dataset carregado com sucesso.")
-print("Variáveis disponíveis no dataset:", list(ds.data_vars))
-
-# Verificar o intervalo e direção das coordenadas para garantir recortes corretos
-print(f"Intervalo de latitude no dataset: {ds.lat.min().values} a {ds.lat.max().values}")
-print(f"Intervalo de longitude no dataset: {ds.lon.min().values} a {ds.lon.max().values}")
-
-# Determinar se latitude está em ordem crescente (sul para norte)
-if ds.lat[0] < ds.lat[-1]:
-    lat_ascendente = True
-    print("Latitude está em ordem crescente (sul para norte).")
-else:
-    lat_ascendente = False
-    print("Latitude está em ordem decrescente (norte para sul).")
-
-# Ajustar fatiamento conforme a direção da latitude para evitar plots vazios
-fatia_lat = slice(lat_min, lat_max) if lat_ascendente else slice(lat_max, lat_min)
-fatia_lon = slice(lon_min, lon_max)  # longitude normalmente crescente
-
-# Verificar se coordenada 'lev' está presente no dataset
-if 'lev' not in ds.coords:
-    print("Atenção: coordenada 'lev' não encontrada no dataset.")
-else:
-    print(f"Níveis de pressão disponíveis: {ds.lev.values}")
-
-#%% 4: Selecionar variável e fazer recortes
-
-if variavel_interesse not in ds:
-    raise ValueError(f"Variável {variavel_interesse} não encontrada no dataset.")
-
-# Selecionar o nível de pressão, se disponível
-if 'lev' in ds.coords:
-    if nivel_pressao in ds.lev.values:
-        da = ds[variavel_interesse].sel(lev=nivel_pressao)
-    else:
-        raise ValueError(f"Nível de pressão {nivel_pressao} hPa não disponível.")
-else:
-    da = ds[variavel_interesse]
-
-# Fazer o recorte espacial inicial
-da_sel = da.sel(lat=fatia_lat, lon=fatia_lon)
-
-print(f"Dimensões da variável selecionada: {da_sel.shape}")
-print(f"Tamanho da dimensão de tempo: {len(da_sel.time)}")
-
-# Remover valores nulos totalmente em lat e lon para evitar erros e vazios
-da_sel = da_sel.dropna(dim='lat', how='all').dropna(dim='lon', how='all')
-
-#%% 5: Figura 1 - Série temporal da média espacial
-
 import matplotlib.dates as mdates
-import locale
+import locale  # Usado para formatar os meses em português
 
-# Definir locale para exibir meses em português (Windows)
-locale.setlocale(locale.LC_TIME, 'Portuguese_Brazil.1252')  # Se der erro, pode comentar esta linha
+# %% 2. Configuração de Parâmetros e Caminhos
+# --- Defina seus caminhos e parâmetros aqui ---
+PASTA_DADOS = r"C:\Users\maria\OneDrive\ENS5132\Trabalho_02\inputs\merra"
+CAMINHO_SHAPEFILE = r"C:\Users\maria\OneDrive\ENS5132\Desafio\inputs\BR_Municipios_2024.shp"
 
-# Calcular média espacial
-media_espacial = da_sel.mean(dim=['lat', 'lon'])
+# Variável de interesse do MERRA-2 (Tendência Total da Temperatura)
+VARIAVEL_INTERESSE = "DTDTTOT"
+# Nível de pressão em hPa (ex: 850 para baixa troposfera)
+NIVEL_PRESSAO = 850
 
-# Criar figura
-plt.figure(figsize=(12,5))
-media_espacial.plot()
+# Lista de variáveis de contribuição para análise comparativa
+VARIAVEIS_CONTRIBUICAO = [
+    'DTDTTOT', 'DTDTANA', 'DTDTDYN', 'DTDTFRI',
+    'DTDTGWD', 'DTDTMST', 'DTDTRB', 'DTDTRAD']
 
-# Formatando eixo x com meses abreviados
-ax = plt.gca()
-ax.xaxis.set_major_locator(mdates.MonthLocator(interval=1))         # Marca 1 por mês
-ax.xaxis.set_major_formatter(mdates.DateFormatter('%b'))            # Abreviação do mês (jan, fev, ...)
-
-# Ajustes visuais
-plt.xticks(rotation=0)
-plt.title(f"Evolução temporal da média espacial - {variavel_interesse} em {nivel_pressao if 'lev' in ds.coords else 'superfície'} hPa")
-plt.xlabel("Mês")
-plt.ylabel(f"{variavel_interesse}")
-plt.grid(True)
-plt.tight_layout()
-plt.show()
-
-
-#%% 6: Figura 2 - Padrão espacial da média temporal
-
-media_temporal = da_sel.mean(dim='time')
-
-# Se variável for tendência (ex.: 'DTDTTOT'), converte para K/dia (multiplica por 86400 seg)
-if variavel_interesse.lower().startswith('dtdt'):
-    media_temporal_plot = media_temporal * 86400
-    legenda_cbar = 'Tendência (K/dia)'
-else:
-    media_temporal_plot = media_temporal
-    legenda_cbar = f'{variavel_interesse} (unidades)'
-
-plt.figure(figsize=(8,7))
-
-media_temporal_plot.plot(
-    cmap='RdBu_r',
-    vmin=-10, vmax=10,
-    cbar_kwargs={'label': legenda_cbar})
-
-plt.title(f"Padrão espacial da média temporal de {variavel_interesse} em {nivel_pressao} hPa")
-plt.xlabel('Longitude')
-plt.ylabel('Latitude')
-plt.tight_layout()
-plt.show()
-
-
-#%% 7: Recorte preciso com shapefile (Brasil)
-
-print("Carregando shapefile para recorte...")
-shape = gpd.read_file(caminho_shapefile)
-
-print(f"Sistema de referência do shapefile: {shape.crs}")
-
-# Garantir que o DataArray tenha sistema de referência CRS correto
-if not hasattr(da_sel, 'rio') or not da_sel.rio.crs:
-    da_sel = da_sel.rio.write_crs("EPSG:4326")
-
+# %% 3. Carregamento e Preparação dos Dados Raster
+print("Carregando arquivos NetCDF...")
 try:
-    # Recortar o DataArray usando as geometrias do shapefile
-    da_clip = da_sel.rio.clip(shape.geometry, shape.crs, drop=True, invert=False)
+    # Abre múltiplos arquivos de forma eficiente e paralela
+    padrao_arquivos = os.path.join(PASTA_DADOS, "*.nc4")
+    ds = xr.open_mfdataset(padrao_arquivos, combine='by_coords', parallel=True)
+    print("Arquivos carregados com sucesso.")
+    print("Variáveis disponíveis:", list(ds.data_vars))
 except Exception as e:
-    print("Erro ao recortar o dado com shapefile:", e)
-    da_clip = None
+    print(f"Erro ao carregar os arquivos NetCDF: {e}")
+    
+# Seleciona a variável e o nível de pressão de interesse
+if VARIAVEL_INTERESSE not in ds:
+    raise ValueError(f"A variável '{VARIAVEL_INTERESSE}' não foi encontrada no dataset.")
 
-if da_clip is not None:
-    print("Recorte realizado com sucesso.")
-    # Calcular média espacial na região recortada
-    media_espacial_clip = da_clip.mean(dim=['lat', 'lon'])
-
-    plt.figure(figsize=(12,5))
-    media_espacial_clip.plot()
-    plt.title(f"Média espacial de {variavel_interesse} recortada pelo shapefile")
-    plt.xlabel("Tempo")
-    plt.ylabel(f"{variavel_interesse} (unidades)")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-
-#%% 8: Análise das contribuições individuais (variáveis específicas)
-
-variaveis_contribuicoes = ['DTDTANA', 'DTDTDYN', 'DTDTFRI', 'DTDTGWD', 'DTDTMST', 'DTDTRB', 'DTDTRAD']
-variaveis_disponiveis = [v for v in variaveis_contribuicoes if v in ds.data_vars]
-
-if variaveis_disponiveis:
-    plt.figure(figsize=(12,6))
-    for var_c in variaveis_disponiveis:
-        if 'lev' in ds.coords and nivel_pressao in ds.lev.values:
-            da_tmp = ds[var_c].sel(lev=nivel_pressao)
-        else:
-            da_tmp = ds[var_c]
-        da_tmp_sel = da_tmp.sel(lat=fatia_lat, lon=fatia_lon)
-        da_tmp_sel = da_tmp_sel.dropna(dim='lat', how='all').dropna(dim='lon', how='all')
-        media = da_tmp_sel.mean(dim=['lat', 'lon'])
-        media.plot(label=var_c)
-    plt.title(f"Contribuições individuais para a tendência da temperatura em {nivel_pressao} hPa")
-    plt.ylabel("Tendência (K/s)")
-    plt.xlabel("Tempo")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
+# Verifica se o dado é 3D (com nível) ou 2D
+if 'lev' in ds[VARIAVEL_INTERESSE].coords:
+    print(f">>> Selecionando dados para o nível de {NIVEL_PRESSAO} hPa...")
+    data_array = ds[VARIAVEL_INTERESSE].sel(lev=NIVEL_PRESSAO)
 else:
-    print("Nenhuma das variáveis de contribuição está disponível no dataset.")
+    data_array = ds[VARIAVEL_INTERESSE]
 
-#%% 9: Estatísticas adicionais - desvio padrão espacial
+# %% 4. Recorte Geográfico Preciso com Shapefile
+print(">>> Realizando recorte com o shapefile dos municípios do Brasil...")
 
-desvio_padrao_espacial = da_sel.std(dim=['lat','lon'])
+# Carrega e prepara o shapefile
+try:
+    shape = gpd.read_file(CAMINHO_SHAPEFILE)
+    # Garante que o shapefile esteja no mesmo sistema de coordenadas dos dados (WGS84)
+    shape = shape.to_crs("EPSG:4326")
+except Exception as e:
+    print(f"Erro ao carregar ou processar o shapefile: {e}")
+    
+# Adiciona informações geoespaciais ao DataArray do xarray
+data_array = data_array.rio.write_crs("EPSG:4326")
 
-plt.figure(figsize=(10,5))
-desvio_padrao_espacial.plot()
-plt.title(f"Desvio padrão espacial ao longo do tempo para {variavel_interesse}")
-plt.xlabel("Tempo")
-plt.ylabel("Desvio padrão (unidades)")
-plt.grid(True)
-plt.tight_layout()
-plt.show()
+# Informa ao rioxarray quais dimensões correspondem a 'x' e 'y'
+data_array = data_array.rio.set_spatial_dims(x_dim="lon", y_dim="lat", inplace=True)
 
-print("""
-Conclusões:
-- A variável DTDTRAD (radiação) mostrou-se dominante na tendência de aquecimento em 500 hPa.
-- Padrões espaciais revelam aquecimento mais intenso sobre a região centro-norte do Brasil.
-- A análise temporal indica maior variação sazonal entre junho e dezembro.
-""")
+# Realiza o recorte (clip)
+try:
+    data_recortado = data_array.rio.clip(shape.geometry, drop=True)
+    print("Recorte geográfico realizado com sucesso.")
+except Exception as e:
+    print(f"Erro durante o recorte com rioxarray: {e}")
+    data_recortado = None
+
+# %% 5. Análise e Visualização dos Dados
+if data_recortado is not None:
+    # GRÁFICO 1: Série Temporal da Média Espacial
+    print(">>> Gerando Gráfico 1: Série Temporal da Média...")
+    media_espacial = data_recortado.mean(dim=["lat", "lon"]) * 86400
+
+    try:
+        locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
+    except locale.Error:
+        print("Aviso: Locale 'pt_BR.UTF-8' não encontrado. Usando locale padrão.")
+        try:
+            locale.setlocale(locale.LC_TIME, '')
+        except locale.Error:
+            print("Aviso: Nenhum locale pôde ser configurado. As datas podem aparecer em inglês.")
+
+    plt.figure(figsize=(14, 6))
+    media_espacial.plot(color='royalblue')
+    ax = plt.gca()
+    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%b/%Y'))
+    plt.title(f"Média da Tendência de Temperatura em {NIVEL_PRESSAO} hPa para o Brasil", fontsize=16, pad=20)
+    plt.xlabel("Mês/Ano", fontsize=12)
+    plt.ylabel("Tendência Média (K/dia)", fontsize=12)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.tight_layout()
+    plt.show()
+
+    # GRÁFICO 2: Padrão Espacial da Média Temporal
+    print(">>> Gerando Gráfico 2: Mapa da Tendência Média...")
+    media_temporal = data_recortado.mean(dim='time') * 86400
+
+    plt.figure(figsize=(10, 8))
+    media_temporal.plot(
+        cmap='RdBu_r',
+        robust=True,
+        cbar_kwargs={'label': 'Tendência Média (K/dia)', 'orientation': 'horizontal', 'pad': 0.1}
+    )
+    shape.plot(ax=plt.gca(), facecolor='none', edgecolor='black', linewidth=0.5)
+    plt.title(f"Padrão Espacial da Tendência de Temperatura em {NIVEL_PRESSAO} hPa", fontsize=16, pad=20)
+    plt.xlabel('Longitude', fontsize=12)
+    plt.ylabel('Latitude', fontsize=12)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.tight_layout()
+    plt.show()
+
+    # GRÁFICO 3: Comparação das Forçantes Físicas
+    print(">>> Gerando Gráfico 3: Comparação das Forçantes...")
+    plt.figure(figsize=(14, 7))
+
+    for var_nome in VARIAVEIS_CONTRIBUICAO:
+        if var_nome in ds:
+            da_contrib = ds[var_nome].sel(lev=NIVEL_PRESSAO)
+            da_contrib = da_contrib.rio.write_crs("EPSG:4326").rio.set_spatial_dims(x_dim="lon", y_dim="lat")
+            da_contrib_clip = da_contrib.rio.clip(shape.geometry, drop=True)
+            media_contrib = da_contrib_clip.mean(dim=["lat", "lon"]) * 86400
+
+            linewidth = 2.5 if var_nome == VARIAVEL_INTERESSE else 1.5
+            linestyle = '--' if var_nome != VARIAVEL_INTERESSE else '-'
+            media_contrib.plot(label=var_nome, linewidth=linewidth, linestyle=linestyle)
+
+    plt.title(f"Componentes da Tendência de Temperatura em {NIVEL_PRESSAO} hPa (Brasil)", fontsize=16, pad=20)
+    plt.ylabel("Tendência Média (K/dia)", fontsize=12)
+    plt.xlabel("Tempo", fontsize=12)
+    plt.legend(title="Forçantes Físicas")
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.tight_layout()
+    plt.show()
+
+print("Análise Concluída")
