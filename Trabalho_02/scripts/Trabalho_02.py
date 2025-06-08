@@ -26,7 +26,6 @@ Fonte dos dados: NASA MERRA-2 https://disc.gsfc.nasa.gov/datasets/M2TUNPTDT_5.12
 
 import os
 import xarray as xr
-import rioxarray
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -39,7 +38,7 @@ CAMINHO_SHAPEFILE = r"C:\Users\maria\OneDrive\ENS5132\Trabalho_02\inputs\BR_UF_2
 # Variável de interesse do MERRA-2 (Tendência Total da Temperatura)
 VARIAVEL_INTERESSE = "DTDTTOT"
 # Nível de pressão em hPa (ex: 850 para baixa troposfera)
-NIVEL_PRESSAO = 850
+NIVEL_PRESSAO = 200
 Lista_dados= ["C:/Users/maria/OneDrive/ENS5132/Trabalho_02/inputs/merra/MERRA2_400.tavgU_3d_tdt_Np.202412.nc4",
 "C:/Users/maria/OneDrive/ENS5132/Trabalho_02/inputs/merra/MERRA2_400.tavgU_3d_tdt_Np.202401.nc4",
 "C:/Users/maria/OneDrive/ENS5132/Trabalho_02/inputs/merra/MERRA2_400.tavgU_3d_tdt_Np.202402.nc4",
