@@ -22,8 +22,7 @@ Script para analisar dados MERRA-2 em arquivos netCDF:
 Fonte dos dados: NASA MERRA-2 https://disc.gsfc.nasa.gov/datasets/M2TUNPTDT_5.12.4/summary
 
 """
-#%%
-
+#%% 1. Imports
 import os
 import xarray as xr
 import geopandas as gpd
@@ -32,13 +31,16 @@ import matplotlib.dates as mdates
 import locale  
 
 # %% 2. Configuração de Parâmetros e Caminhos
-# --- Defina seus caminhos e parâmetros aqui ---
 PASTA_DADOS = r"C:\Users\maria\OneDrive\ENS5132\Trabalho_02\inputs\merra"
 CAMINHO_SHAPEFILE = r"C:\Users\maria\OneDrive\ENS5132\Trabalho_02\inputs\BR_UF_2024"
+
 # Variável de interesse do MERRA-2 (Tendência Total da Temperatura)
-VARIAVEL_INTERESSE = "DTDTTOT"
+VARIAVEL_INTERESSE = "DTDTTOT" # neste caso foi a tendência total (soma de todas as componentes)
+# Através das abreviações explicitadas no documento conseguimos fazer análise das tendências específicas (ex: radiação, umidade e como ela influencia na temperatura)
 # Nível de pressão em hPa (ex: 850 para baixa troposfera)
-NIVEL_PRESSAO = 200
+
+NIVEL_PRESSAO = 850 # aqui defino qual nível da atmosfera quero averiguar
+
 Lista_dados= ["C:/Users/maria/OneDrive/ENS5132/Trabalho_02/inputs/merra/MERRA2_400.tavgU_3d_tdt_Np.202412.nc4",
 "C:/Users/maria/OneDrive/ENS5132/Trabalho_02/inputs/merra/MERRA2_400.tavgU_3d_tdt_Np.202401.nc4",
 "C:/Users/maria/OneDrive/ENS5132/Trabalho_02/inputs/merra/MERRA2_400.tavgU_3d_tdt_Np.202402.nc4",
@@ -51,13 +53,14 @@ Lista_dados= ["C:/Users/maria/OneDrive/ENS5132/Trabalho_02/inputs/merra/MERRA2_4
 "C:/Users/maria/OneDrive/ENS5132/Trabalho_02/inputs/merra/MERRA2_400.tavgU_3d_tdt_Np.202409.nc4",
 "C:/Users/maria/OneDrive/ENS5132/Trabalho_02/inputs/merra/MERRA2_400.tavgU_3d_tdt_Np.202410.nc4",
 "C:/Users/maria/OneDrive/ENS5132/Trabalho_02/inputs/merra/MERRA2_400.tavgU_3d_tdt_Np.202411.nc4"]
+
 # Lista de variáveis de contribuição para análise comparativa
 VARIAVEIS_CONTRIBUICAO = [
     'DTDTTOT', 'DTDTANA', 'DTDTDYN', 'DTDTFRI',
     'DTDTGWD', 'DTDTMST', 'DTDTRB', 'DTDTRAD']
+
 PASTA_SAIDA_GRAFICOS= r"C:\Users\maria\OneDrive\ENS5132\Trabalho_02\outputs"
 # %% 3. Carregamento e Preparação dos Dados Raster
-
 print("Verificando a existência dos arquivos na lista...")
 arquivos_existentes = []
 for f in Lista_dados:
@@ -66,7 +69,6 @@ for f in Lista_dados:
         print(f"  - Encontrado: {f}")
     else:
         print(f"  - **AVISO: Não encontrado:** {f}")
-
 if not arquivos_existentes:
     print("ERRO: Nenhum dos arquivos na lista foi encontrado. Verifique os caminhos.")
     ds = None # Define ds como None para a verificação posterior
@@ -80,8 +82,6 @@ else:
         print("Verifique a integridade dos arquivos e a compatibilidade para combinação.")
         ds = None # Garante que ds é None em caso de falha
 
-# --- Sua linha de código original (ou similar) ---
-#%%VARIAVEL_INTERESSE = 'TDT' # Exemplo: A temperatura 3D, ajuste para a sua variável real
 
 if ds is None:
     raise RuntimeError("O dataset 'ds' é None. Não foi possível carregar os arquivos .nc4. Verifique a lista de arquivos e a mensagem de erro acima.")
@@ -90,13 +90,10 @@ elif VARIAVEL_INTERESSE not in ds:
 else:
     print(f"A variável '{VARIAVEL_INTERESSE}' foi encontrada no dataset.")
     print("Primeiras linhas do dataset combinado:")
-    print(ds)
-    # Agora você pode trabalhar com 'ds'
-    # Por exemplo:
-    # print(ds[VARIAVEL_INTERESSE])
+    print(ds)    
 print("Carregando arquivos NetCDF...")
 try:
-    # Abre múltiplos arquivos de forma eficiente e paralela
+    # Abre múltiplos arquivos de forma eficiente 
     padrao_arquivos = os.path.join(Lista_dados)
     ds = xr.open_mfdataset(padrao_arquivos, combine='by_coords', parallel=True)
     print("Arquivos carregados com sucesso.")
