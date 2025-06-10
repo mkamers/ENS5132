@@ -82,7 +82,6 @@ else:
         print("Verifique a integridade dos arquivos e a compatibilidade para combinação.")
         ds = None # Garante que ds é None em caso de falha
 
-
 if ds is None:
     raise RuntimeError("O dataset 'ds' é None. Não foi possível carregar os arquivos .nc4. Verifique a lista de arquivos e a mensagem de erro acima.")
 elif VARIAVEL_INTERESSE not in ds:
